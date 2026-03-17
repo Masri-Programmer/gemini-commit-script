@@ -53,86 +53,84 @@ Strict Rules:
    - NO conversational filler, greetings, or explanations."
 
 # ==========================================
-# 2. ATTEMPT GEMINI
+# 2. ATTEMPT OLLAMA (First Try)
 # ==========================================
-geminiSuccess=false
+ollamaSuccess=false
+commitMsg=""
 
-# --- Gemini Configuration ---
-if [ -z "$GEMINI_API_KEY" ]; then
-    # Fallback to hardcoded key if env var is missing (Matches PS1 script logic)
-    GEMINI_API_KEY="AIzaSyA7Et4mVYMSXq9O-3NIiUpeZKBX4IyWw5k" 
-fi
+OLLAMA_URL="http://localhost:11434/api/chat"
+ollamaModelsToTry=("qwen2.5-coder:3b") 
 
-# Model choice (using gemini-1.5-flash for reliability)
-GEMINI_MODEL="gemini-1.5-flash" 
-GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}"
+for OLLAMA_MODEL in "${ollamaModelsToTry[@]}"; do
+    echo "🤖 Attempting Ollama ($OLLAMA_MODEL)..." >&2
 
-echo "🤖 Attempting Gemini ($GEMINI_MODEL)..." >&2
+    ollamaBody=$(jq -n \
+        --arg system "$systemPromptText" \
+        --arg user "Here is the diff to analyze:\n$diff" \
+        --arg model "$OLLAMA_MODEL" \
+        '{
+            model: $model,
+            messages: [
+                { role: "system", content: $system },
+                { role: "user", content: $user }
+            ],
+            stream: false,
+            options: { temperature: 0.1, num_ctx: 2048 }
+        }')
 
-# Construct Gemini JSON Body using jq
-geminiBody=$(jq -n \
-    --arg system "$systemPromptText" \
-    --arg user "Here is the diff to analyze:\n$diff" \
-    '{
-        systemInstruction: { parts: [{ text: $system }] },
-        contents: [{ role: "user", parts: [{ text: $user }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
-    }')
+    response=$(curl -s -X POST "$OLLAMA_URL" \
+        -H "Content-Type: application/json" \
+        -d "$ollamaBody")
 
-# Call Gemini API
-response=$(curl -s -X POST "$GEMINI_URL" \
-    -H "Content-Type: application/json" \
-    -d "$geminiBody")
+    commitMsg=$(echo "$response" | jq -r '.message.content // empty')
 
-# Extract Message
-commitMsg=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // empty')
-
-if [ -n "$commitMsg" ] && [ "$commitMsg" != "null" ]; then
-    geminiSuccess=true
-else
-    echo "⚠️ Gemini Failed or returned empty response." >&2
-fi
+    if [ -n "$commitMsg" ] && [ "$commitMsg" != "null" ]; then
+        ollamaSuccess=true
+        break
+    fi
+    echo "⚠️ Ollama ($OLLAMA_MODEL) Failed." >&2
+done
 
 # ==========================================
-# 3. FALLBACK TO OLLAMA (If Gemini Failed)
+# 3. FALLBACK TO GEMINI (If Ollama Failed)
 # ==========================================
-if [ "$geminiSuccess" = false ]; then
-    OLLAMA_URL="http://localhost:11434/api/chat"
-    ollamaModelsToTry=("qwen2.5-coder:7b" "qwen2.5:3b") 
-    ollamaSuccess=false
+if [ "$ollamaSuccess" = false ]; then
+    geminiSuccess=false
 
-    for OLLAMA_MODEL in "${ollamaModelsToTry[@]}"; do
-        echo "🤖 Attempting Ollama ($OLLAMA_MODEL)..." >&2
+    # --- Gemini Configuration ---
+    if [ -z "$GEMINI_API_KEY" ]; then
+        # Fallback to hardcoded key if env var is missing
+        GEMINI_API_KEY="AIzaSyA7Et4mVYMSXq9O-3NIiUpeZKBX4IyWw5k" 
+    fi
 
-        ollamaBody=$(jq -n \
-            --arg system "$systemPromptText" \
-            --arg user "Here is the diff to analyze:\n$diff" \
-            --arg model "$OLLAMA_MODEL" \
-            '{
-                model: $model,
-                messages: [
-                    { role: "system", content: $system },
-                    { role: "user", content: $user }
-                ],
-                stream: false,
-                options: { temperature: 0.1, num_ctx: 2048 }
-            }')
+    # Model choice (using gemini-2.5-flash as requested)
+    GEMINI_MODEL="gemini-2.5-flash" 
+    GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}"
 
-        response=$(curl -s -X POST "$OLLAMA_URL" \
-            -H "Content-Type: application/json" \
-            -d "$ollamaBody")
+    echo "🤖 Attempting Gemini ($GEMINI_MODEL)..." >&2
 
-        commitMsg=$(echo "$response" | jq -r '.message.content // empty')
+    # Construct Gemini JSON Body using jq
+    geminiBody=$(jq -n \
+        --arg system "$systemPromptText" \
+        --arg user "Here is the diff to analyze:\n$diff" \
+        '{
+            systemInstruction: { parts: [{ text: $system }] },
+            contents: [{ role: "user", parts: [{ text: $user }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+        }')
 
-        if [ -n "$commitMsg" ] && [ "$commitMsg" != "null" ]; then
-            ollamaSuccess=true
-            break
-        fi
-        echo "⚠️ Ollama ($OLLAMA_MODEL) Failed." >&2
-    done
+    # Call Gemini API
+    response=$(curl -s -X POST "$GEMINI_URL" \
+        -H "Content-Type: application/json" \
+        -d "$geminiBody")
 
-    if [ "$ollamaSuccess" = false ]; then
-        echo "❌ All Ollama models failed." >&2
+    # Extract Message
+    commitMsg=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // empty')
+
+    if [ -n "$commitMsg" ] && [ "$commitMsg" != "null" ]; then
+        geminiSuccess=true
+    else
+        echo "❌ Gemini Failed or returned empty response." >&2
         exit 1
     fi
 fi
