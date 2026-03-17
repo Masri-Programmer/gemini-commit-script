@@ -59,7 +59,7 @@ ollamaSuccess=false
 commitMsg=""
 
 OLLAMA_URL="http://localhost:11434/api/chat"
-ollamaModelsToTry=("qwen2.5-coder:3b") 
+ollamaModelsToTry=("qwen3-coder:480b-cloud") 
 
 for OLLAMA_MODEL in "${ollamaModelsToTry[@]}"; do
     echo "🤖 Attempting Ollama ($OLLAMA_MODEL)..." >&2
