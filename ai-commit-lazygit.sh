@@ -4,6 +4,9 @@
 
 set -e
 
+# Disable MSYS2 path conversion to prevent corruption of JSON payloads containing file paths
+export MSYS_NO_PATHCONV=1
+
 # --- Default Paths ---
 CONFIG_DIR="$HOME/.config/ai-commit-lazygit"
 CONFIG_FILE="$CONFIG_DIR/config.json"
@@ -198,13 +201,11 @@ parse_json_response() {
     elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
         local py_cmd="python3"
         command -v python3 >/dev/null 2>&1 || py_cmd="python"
-        export TEMP_RESP="$json_str"
         if [ "$mode" = "ollama" ]; then
-            $py_cmd -c 'import json, os; print(json.loads(os.environ["TEMP_RESP"])["message"]["content"])' 2>/dev/null
+            echo "$json_str" | $py_cmd -c 'import json, sys; print(json.load(sys.stdin)["message"]["content"])' 2>/dev/null
         else
-            $py_cmd -c 'import json, os; print(json.loads(os.environ["TEMP_RESP"])["candidates"][0]["content"]["parts"][0]["text"])' 2>/dev/null
+            echo "$json_str" | $py_cmd -c 'import json, sys; print(json.load(sys.stdin)["candidates"][0]["content"]["parts"][0]["text"])' 2>/dev/null
         fi
-        unset TEMP_RESP
     else
         # fallback grep
         if [ "$mode" = "ollama" ]; then
@@ -265,9 +266,9 @@ fi
 # --- Step 4: Cleanup & Formatting ---
 # Clean the message
 commitMsg=$(echo "$commitMsg" | sed -E 's/^```.*$//g' | sed -E 's/```$//g')
-commitMsg=$(echo "$commitMsg" | sed -n '/^diff --git/!p')
+commitMsg=$(echo "$commitMsg" | sed -E '/^(diff --git|index [0-9a-f]|--- a\/|\+\+\+ b\/)/,$d')
 # trim whitespace
-commitMsg=$(echo "$commitMsg" | xargs)
+commitMsg=$(echo "$commitMsg" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
 # Extract ticket ID if enabled
 if [ "$ticket_integration" = "true" ] && [ -n "$BRANCH_NAME" ]; then

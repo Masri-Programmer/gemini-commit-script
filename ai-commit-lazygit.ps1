@@ -222,7 +222,7 @@ $commitMsg = $commitMsg.Trim()
 # Remove markdown code block markers
 $commitMsg = $commitMsg -replace '^```.*$', '' -replace '```$', '' 
 # Remove accidental diff inclusions
-$commitMsg = $commitMsg -replace '(?m)^diff --git.*[\s\S]*$', ''
+$commitMsg = $commitMsg -replace '(?m)^(diff --git|index [0-9a-f]|--- a/|\+\+\+ b/).*[\s\S]*$', ''
 $commitMsg = $commitMsg.Trim()
 
 # Apply ticket ID prefix if configured and found
