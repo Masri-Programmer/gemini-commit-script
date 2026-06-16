@@ -1,1 +1,0 @@
-﻿feat: add logic for transferring proceeds to donation campaign

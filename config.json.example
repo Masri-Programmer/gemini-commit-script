@@ -1,0 +1,25 @@
+{
+  "//": "AI Commit for Lazygit Configuration Example",
+  "//": "Copy this file to ~/.config/ai-commit-lazygit/config.json",
+
+  "// provider": "Can be 'ollama', 'gemini', or 'both' (which tries Gemini first and falls back to Ollama if unsuccessful)",
+  "provider": "ollama",
+
+  "// gemini_api_key": "Your Google Gemini API Key. Can be left empty if you set the GEMINI_API_KEY environment variable",
+  "gemini_api_key": "",
+
+  "// gemini_model": "The Gemini model to use. Recommended: 'gemini-2.5-flash'",
+  "gemini_model": "gemini-2.5-flash",
+
+  "// ollama_model": "The local Ollama model to use. Recommended: 'granite4:7b-a1b-h' or 'qwen2.5-coder:7b'",
+  "ollama_model": "granite4:7b-a1b-h",
+
+  "// ollama_url": "The URL to your local Ollama instance (using the /api/chat endpoint)",
+  "ollama_url": "http://localhost:11434/api/chat",
+
+  "// ticket_integration": "Extract digit ticket numbers from the branch name and prepend to the commit subject",
+  "ticket_integration": false,
+
+  "// ticket_format": "The format template for the ticket ID. Use '$ticketId' as a placeholder",
+  "ticket_format": "(#$ticketId) "
+}
